@@ -1,7 +1,7 @@
 {
   "id": "colorimetric-film",
   "name": "3D Colorimetric Film",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A film-like display transform worked out in CIE XYZ: a single-stage tone scale with contrast, toe, shoulder and mid-tones, a chroma roll-off toward the spectral locus, highlight bleaching with hue rotation, vibrance, X/Z chroma contrast, colour looks and a monochrome look with colour filters.",
   "author": "Anthony Reimche",
   "main": "dist/index.js",

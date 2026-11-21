@@ -1,7 +1,7 @@
 {
   "name": "safelight-colorimetric-film",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "3D Colorimetric Film for Safelight: a film-like tone mapper worked out in CIE XYZ, as a display transform with all of its sliders.",
   "type": "module",
   "scripts": {

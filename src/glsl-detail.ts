@@ -48,7 +48,7 @@ float tdcfTap(int i, float r) {
 ivec2 tdcfPassSize() {
   return ivec2(round(1.0 / uTexel));
 }
-float tdcfLumaAt(ivec2 texel) {
+float tdcfLumaAt(highp ivec2 texel) {
   vec3 rgb = TDCF_PASS_709_TO_2020 * fetchInput(texel);
   rgb = vec3(
     abs(rgb.r) <= 3.0e38 ? max(rgb.r, 0.0) : 0.0,
@@ -59,7 +59,7 @@ float tdcfLumaAt(ivec2 texel) {
 ${lumaRows}
   return dot(lc, rgb) * exp2(input_exposure);
 }
-vec2 tdcfPrevAt(ivec2 texel) {
+vec2 tdcfPrevAt(highp ivec2 texel) {
   return readPrev((vec2(texel) + 0.5) * uTexel).xy;
 }`;
 
