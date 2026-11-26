@@ -18,6 +18,7 @@ export function activate(host: SafelightAPI): void {
     title: PANEL_TITLE,
     component: FilmPanel,
     defaultDock: { module: "develop", direction: "right", order: 4, width: 268 },
+    modules: ["develop"],
     onReset: resetActive,
   });
 }

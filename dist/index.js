@@ -2258,6 +2258,7 @@ function Ft(e) {
 			order: 4,
 			width: 268
 		},
+		modules: ["develop"],
 		onReset: jt
 	});
 }
