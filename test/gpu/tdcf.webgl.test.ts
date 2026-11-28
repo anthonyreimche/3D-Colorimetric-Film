@@ -5,7 +5,10 @@
 //    uniforms, beside the built-in stages, on process versions 2 and 3;
 //  â€¢ over a grid of settings, every patch of a test chart matches the twin,
 //    the detail recovery's pre-pass included (the chart is its own full image,
-//    so the passes run at the twin's radius).
+//    so the passes run at the twin's radius);
+//  • without float render targets core's pre-pass result isn't valid
+//    (slTransformPassValid), so the recovery stays off and the render follows
+//    every edit ahead of the transform instead of the unedited source's filter.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolvePipelineFor } from "@/extensions/pipelines";
@@ -13,7 +16,7 @@ import { registerPipeline, unregisterExtension } from "@/extensions/registry";
 import { bagForRender } from "@/extensions/transform-derive";
 import type { WebGLRenderer } from "@/rendering/webgl/renderer";
 import {
-  builtinStages, floatImage, identityParams, pixelAt, rendererBuildError, toHalf, withRenderer,
+  basicStages, builtinStages, floatImage, freshContext, glHarness, identityParams, pixelAt, rendererBuildError, toHalf, withRenderer,
 } from "@/rendering/webgl/webgl.test-support";
 import { apply, type Vec3 } from "@tdcf/colour/mat3";
 import { REC2020_TO_REC709, REC709_TO_REC2020 } from "@tdcf/colour/profiles";
@@ -115,6 +118,64 @@ describe("3D Colorimetric Film", () => {
           expect(Math.abs(v - want[i][ch]), `${label} v${version} patch ${i} ${JSON.stringify(PATCHES[i])} ch ${ch}: ${v} vs ${want[i][ch]}`).toBeLessThan(bound);
         }),
       );
+    }
+  });
+});
+
+// A textured scene with highlights, so the recovery moves pixels: 3-pixel
+// blocks alternating around 1.1 and 0.25 over a gradient.
+const TEXTURE = floatImage(64, 48, (x, y) => {
+  const v = ((Math.floor(x / 3) + Math.floor(y / 3)) % 2 === 0 ? 1.1 : 0.25) * (0.7 + (0.6 * x) / 63);
+  return [v, v * 0.9, v * 0.8];
+});
+
+/** The canvas as drawn, for each exposure edit ahead of the transform. */
+function canvasFrames(over: Partial<Params>, exposures: readonly number[], canvas?: HTMLCanvasElement): Uint8Array[] {
+  const params: Params = { ...DEFAULTS, ...over };
+  const pipeline = resolvePipelineFor(TRANSFORM_ID);
+  const { gl } = canvas ? { gl: canvas.getContext("webgl2") as WebGL2RenderingContext } : glHarness();
+  return withRenderer(
+    { stages: basicStages(), pipeline, processVersionCap: 3 },
+    (r: WebGLRenderer) => {
+      r.setImage(TEXTURE);
+      return exposures.map((exposure) => {
+        r.setParams(identityParams({ processVersion: 3, displayTransform: TRANSFORM_ID, exposure }));
+        r.setContributedParams(bagForRender(pipeline, bagOf(params)));
+        r.render();
+        const raw = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+        return raw;
+      });
+    },
+    canvas,
+  );
+}
+
+const worstCode = (a: Uint8Array, b: Uint8Array): number => a.reduce((m, v, i) => Math.max(m, Math.abs(v - b[i])), 0);
+const meanCode = (raw: Uint8Array): number => {
+  let sum = 0;
+  for (let i = 0; i < raw.length; i += 4) sum += raw[i] + raw[i + 1] + raw[i + 2];
+  return sum / ((raw.length / 4) * 3);
+};
+
+describe("detail recovery without float render targets", () => {
+  it("moves pixels on float targets, so the scene exercises it", () => {
+    const [on] = canvasFrames({ hl_detail_recovery: 1 }, [0]);
+    const [off] = canvasFrames({ hl_detail_recovery: 0 }, [0]);
+    expect(worstCode(on, off)).toBeGreaterThan(2);
+  });
+
+  it("stays off, and follows an exposure edit ahead of the transform", () => {
+    const context = freshContext({ noFloat: true });
+    try {
+      const on = canvasFrames({ hl_detail_recovery: 1 }, [0, 1], context.canvas);
+      const off = canvasFrames({ hl_detail_recovery: 0 }, [0, 1], context.canvas);
+      console.log(`no float targets, mean code: recovery 1 ${meanCode(on[0]).toFixed(2)} -> ${meanCode(on[1]).toFixed(2)}, recovery 0 ${meanCode(off[0]).toFixed(2)} -> ${meanCode(off[1]).toFixed(2)}`);
+      expect(meanCode(off[1]) - meanCode(off[0])).toBeGreaterThan(5);
+      for (const k of [0, 1]) expect(worstCode(on[k], off[k])).toBeLessThanOrEqual(1);
+    } finally {
+      context.release();
     }
   });
 });

@@ -1749,8 +1749,10 @@ vec3 tdcfProcess(vec3 c) {
   }
   vec3 o = tdcfEval(rgb);
   if (tdcfLookMix.y > 0.5) o = max(o * (1.0 - tdcfLookMix.x) + (tdcfLook * o) * tdcfLookMix.x, vec3(0.0));
-  // The pre-pass runs exactly while the recovery isn't 0 (its dormantWhen).
-  if (tdcfLookMix.w > 0.0) o = tdcfRecover(o, lumOrig, desatFactor);
+  // The pre-pass runs exactly while the recovery isn't 0 (its dormantWhen),
+  // but its result is only the filter of this image where core says so (float
+  // targets, drawn this frame); elsewhere the recovery is off.
+  if (tdcfLookMix.w > 0.0 && slTransformPassValid) o = tdcfRecover(o, lumOrig, desatFactor);
   return o;
 }`, Le = "vec3 pipelineToDisplay(vec3 lin) {\n  return tdcfEncode(TDCF_2020_TO_709 * tdcfProcess(TDCF_709_TO_2020 * lin));\n}";
 Number.isFinite;

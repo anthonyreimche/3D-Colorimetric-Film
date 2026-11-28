@@ -3,8 +3,9 @@
 // The slice of Safelight's extension API this extension touches, mirrored from
 // the app's src/extensions/types.ts, src/extensions/ui-kit.tsx,
 // src/extensions/pipelines.ts, src/modules/develop/mask-scope.tsx,
-// src/rendering/float-frame.ts and src/state/develop-store.ts (core 3.1.0
-// with display transform params and the scene capture point). Extensions are
+// src/rendering/float-frame.ts and src/state/develop-store.ts (core 3.2.8:
+// display transform params, the scene capture point and the transform
+// pre-pass with slTransformPassValid). Extensions are
 // standalone bundles, so the host's source is not on the type path; React
 // types come from @types/react (dev only).
 
@@ -42,21 +43,40 @@ export interface PipelineContribution {
   params?: UniformDeclaration[];
   helpers?: string;
   derive?: TransformDerive;
-  /** GPU passes over the image entering the transform (Safelight 3.2.6);
-   *  their result reaches glsl as `vec3 slTransformPass`. */
+  /** GPU passes over the image as it enters the transform, for a transform
+   *  that needs a pixel's neighbourhood (a local-contrast or detail term).
+   *  Needs `glsl`, and Safelight 3.2.6. Their result reaches glsl as
+   *  `vec3 slTransformPass`, which is only the filter of this image where the
+   *  global `bool slTransformPassValid` (since 3.2.8) is true. */
   prepass?: TransformPrepass;
 }
 
-/** One GPU pass (the core's StagePass, as far as this extension uses it). */
+/** One draw of a pre-pass, as core's StagePass: `glsl` mutates `vec3 c` (or
+ *  `vec4 c` with channels 4), with the helpers fetchInput, readPrev and the
+ *  texel size uTexel in scope. */
 export interface StagePass {
   glsl: string;
   helpers?: string;
+  iterations?: number;
   uniforms?: UniformDeclaration[];
+  channels?: 3 | 4;
 }
 
+/** A display transform's pre-pass (PipelineContribution.prepass). Its last
+ *  draw's rgb reaches `glsl` and `helpers` as the global `vec3 slTransformPass`.
+ *  Read it only where the global `bool slTransformPassValid` is true (since
+ *  3.2.8): the passes drew it, or kept it from an earlier frame of the same
+ *  image, from the image as the transform receives it, on float render
+ *  targets. It's false while dormantWhen holds, without float render targets
+ *  (the passes then run at 8 bits on the unedited source), when the GPU
+ *  refuses a target they draw into, when they get no texture unit or result
+ *  layer, and when a pass throws. Draw the transform's own path from `lin`
+ *  there. */
 export interface TransformPrepass {
   passes: StagePass[];
-  /** While every listed pass uniform holds its value, no pass runs. */
+  /** When the passes change nothing: pass uniform key → value. While every
+   *  listed uniform holds its value, no pass draws and slTransformPassValid is
+   *  false. */
   dormantWhen?: Readonly<Record<string, UniformValue>>;
 }
 

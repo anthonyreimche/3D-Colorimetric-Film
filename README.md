@@ -2,7 +2,7 @@
 
 A Safelight extension that adds **3D Colorimetric Film**, a display transform
 (tone mapper) with all of its sliders, and a panel in Develop to edit it. It
-needs Safelight 3.2.6 or later.
+needs Safelight 3.2.8 or later.
 
 It works in CIE XYZ. Luminance goes through a single-stage tone scale (the
 ACES 2.0 one, set by a peak luminance), then a contrast curve around a pivot
@@ -51,6 +51,14 @@ the same in all three renderings.
   the resolution Safelight works at, so Develop, thumbnails and exports
   agree; the original's own preview uses that many pixels of the smaller
   preview instead.
+- **Detail recovery switches itself off where the pre-pass can't be
+  trusted.** Safelight tells the shader whether the pre-pass result is the
+  filter of the image this transform receives (`slTransformPassValid`). On
+  a GPU without float render targets the passes run at 8 bits on the
+  unedited source, and if a pass fails or the prepass units run out its
+  result is stale or missing; in those cases the recovery is skipped and
+  the render is the transform without it, so every edit ahead of the
+  transform still shows. The original has no such case.
 - **Auto adjust measures the whole view.** The original can also anchor
   exposure on a grey point picked on the image; Safelight has no picker for
   extensions, so this uses the original's measurement without a pick.
@@ -81,7 +89,8 @@ the same in all three renderings.
   X/Z lock, and the panel.
 - `npm run test:gpu`: the shader and the detail pre-pass on Safelight's real
   renderer (headless Chromium on SwiftShader) against the twin, over 17
-  settings on process versions 2 and 3. It needs a SafeLight checkout beside this folder, or
+  settings on process versions 2 and 3, and the detail recovery's fallback on a
+  context without float render targets. It needs a SafeLight checkout beside this folder, or
   `SAFELIGHT_CORE`.
 
 ## Credits and licence
